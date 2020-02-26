@@ -382,23 +382,7 @@ def mount_dict_vol_to_bind(compose, mount_dict):
     try: out = compose.podman.output(["volume", "inspect", vol_name]).decode('utf-8')
     except subprocess.CalledProcessError:
         compose.podman.output(["volume", "create", "--label", "io.podman.compose.project={}".format(proj_name), vol_name])
-        out = compose.podman.output(["volume", "inspect", vol_name]).decode('utf-8')
-    try:
-        src = json.loads(out)[0]["mountPoint"]
-    except KeyError:
-        src = json.loads(out)[0]["Mountpoint"]
-    ret=dict(mount_dict, type="bind", source=src, _vol=vol_name)
-    bind_prop=ret.get("bind", {}).get("propagation")
-    if not bind_prop:
-        if "bind" not in ret:
-            ret["bind"]={}
-        # if in top level volumes then it's shared bind-propagation=z
-        if vol_name_orig and vol_name_orig in shared_vols:
-            ret["bind"]["propagation"]="z"
-        else:
-            ret["bind"]["propagation"]="Z"
-    try: del ret["volume"]
-    except KeyError: pass
+    ret=dict(mount_dict, _vol=vol_name)
     return ret
 
 def mount_desc_to_args(compose, mount_desc, srv_name, cnt_name):
@@ -436,6 +420,12 @@ def mount_desc_to_args(compose, mount_desc, srv_name, cnt_name):
         return "type=tmpfs,destination={target},{opts}".format(
             target=target,
             opts=opts
+        ).rstrip(",")
+    elif mount_type=='volume':
+            return "type=volume,source={source},destination={target},{opts}".format(
+                source=source,
+                target=target,
+                opts=opts
         ).rstrip(",")
     else:
         raise ValueError("unknown mount type:"+mount_type)
